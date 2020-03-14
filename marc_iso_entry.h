@@ -148,6 +148,8 @@ private:
                 {
                     cerr << recordid_from_raw << "\t[WRN] Corrupt data. ";
                     cerr << "[WRN] VIRT VS REAL: " << fld_raw_virt << " | " << fld_raw_real << endl;
+                    if (!cerr.good()) // Some special chars in `fld_raw_virt` or `fld_raw_real` will cause `cerr` to go bad in Windows console.
+                        cerr.clear();
                     bad_data_flg = true;
                 }
             }
