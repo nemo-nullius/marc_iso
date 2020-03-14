@@ -1,0 +1,10 @@
+workplace
+.vscode
+example
+a
+*.out
+b.txt
+*.exe
+*.obj
+r.txt
+try.cpp
