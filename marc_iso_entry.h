@@ -80,11 +80,11 @@ private:
     }
     void makefields() // append fields, return a set of bad data (append)
     {
-        map<string, string> subfields; // subfields
+        multimap<string, string> subfields; // subfields
         // get & insert
         // insert ldr
         string rawldr = string(raw, rawpos.ldr.first, rawpos.ldr.second - rawpos.ldr.first);
-        subfields["NUL"] = rawldr;
+        subfields.insert(make_pair("NUL", rawldr));
         fields.insert(make_pair("ldr", subfields));
         subfields.clear();
         // check data length
@@ -93,11 +93,11 @@ private:
         // no bad_data_flag or err_data_flag defined here
         if (stoi_safe(string(rawldr.begin(), rawldr.begin() + 5), &raw_len_virt) < 0)
         {
-            cerr << recordid_from_raw << "\t[WAR] Literal data length not obtainable." << endl;
+            cerr << recordid_from_raw << "\t[WRN] Literal data length not obtainable." << endl;
         }
         else if (raw_len_virt != raw_len_real)
         {
-            cerr << recordid_from_raw << "\t[WAR] Literal data length not consistent with actual data length (" << raw_len_virt
+            cerr << recordid_from_raw << "\t[WRN] Literal data length not consistent with actual data length (" << raw_len_virt
                  << " " << raw_len_real << ")" << endl;
         }
 
@@ -146,8 +146,8 @@ private:
                 string fld_raw_virt = string(rawbody, stoul(fld_bpos), stoul(fld_len));
                 if (fld_raw_virt != fld_raw_real)
                 {
-                    cerr << recordid_from_raw << "\t[WAR] Corrupt data. ";
-                    cerr << "[WAR] VIRT VS REAL: " << fld_raw_virt << " " << fld_raw_real << endl;
+                    cerr << recordid_from_raw << "\t[WRN] Corrupt data. ";
+                    cerr << "[WRN] VIRT VS REAL: " << fld_raw_virt << " | " << fld_raw_real << endl;
                     bad_data_flg = true;
                 }
             }
@@ -155,7 +155,7 @@ private:
             {
                 //cerr << "data size: " << raw.size() << endl;
                 //cerr << "bodydata size: " << rawbody.size() << endl;
-                cerr << recordid_from_raw << "\t[WAR] Corrupt data. Body data lost." << endl;
+                cerr << recordid_from_raw << "\t[WRN] Corrupt data. Body data lost." << endl;
                 bad_data_flg = true;
             }
             string fld_raw = fld_raw_real;
@@ -174,22 +174,23 @@ private:
             if (fld_num == "001" || fld_num == "005")
             {
                 // no subfield
-                subfields["NUL"] = string(fld_raw.begin() + 1, fld_raw.end()); // jump over "\x1e"
+                subfields.insert(make_pair("NUL", string(fld_raw.begin() + 1, fld_raw.end()))); // jump over "\x1e"
             }
             else
             {
                 // one or more than one subfields
                 //[subfield_flag(3):\x1eAB, subfield_text(...):\x1fa...\x1fb...]
                 string fld_flg = string(fld_raw.begin() + 1, fld_raw.begin() + 3);
-                subfields["_FLG"] = fld_flg;
+                subfields.insert(make_pair("_FLG", fld_flg));
                 auto subf_pos_all = this->findall(fld_raw, "\x1f", 0);
                 for (auto beg = subf_pos_all.begin(); beg != subf_pos_all.end() - 1; ++beg)
                 {
                     string k = string(fld_raw.begin() + *beg + 1, fld_raw.begin() + *beg + 2);
                     string v = string(fld_raw.begin() + *beg + 2, fld_raw.begin() + *(beg + 1));
-                    subfields[k] = v;
+                    subfields.insert(make_pair(k, v));
                 }
-                subfields[string(fld_raw.begin() + *(subf_pos_all.end() - 1) + 1, fld_raw.begin() + *(subf_pos_all.end() - 1) + 2)] = string(fld_raw.begin() + *(subf_pos_all.end() - 1) + 2, fld_raw.end());
+                subfields.insert(make_pair(string(fld_raw.begin() + *(subf_pos_all.end() - 1) + 1, fld_raw.begin() + *(subf_pos_all.end() - 1) + 2),
+                                           string(fld_raw.begin() + *(subf_pos_all.end() - 1) + 2, fld_raw.end())));
             }
             fields.insert(make_pair(fld_num, subfields));
             subfields.clear();

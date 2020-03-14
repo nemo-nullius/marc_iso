@@ -1,10 +1,11 @@
-workplace
+workplace*
 .vscode
 example
 a
+a.txt
 *.out
 b.txt
 *.exe
 *.obj
 r.txt
-try.cpp
+try*.cpp

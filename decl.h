@@ -28,7 +28,7 @@ using std::stoul;
 using std::string;
 using std::vector;
 
-typedef multimap<string, map<string, string>> mmm;
+typedef multimap<string, multimap<string, string>> mmm;
 
 #ifndef FUNC_WITHPARA
 #define FUNC_WITHPARA

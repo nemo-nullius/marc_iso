@@ -4,7 +4,7 @@
 struct KeyInfo
 {
     size_t sum;
-    set<string> subkeys;
+    map<string, size_t> subkeys;
 };
 
 struct MarcIsoFile
@@ -101,16 +101,12 @@ inline void MarcIsoFile::get_keys_templ() // keys_templ
         map<string, size_t> keys_sum_one_record; // to check duplicate keys in one record
         for (const auto &fkv : rec_proc)         // pair<...>
         {
-            const auto &fk = fkv.first;
-            const auto &fv = fkv.second;
+            const auto &fk = fkv.first;  // field name
+            const auto &fv = fkv.second; // subfields
 
             // update keys_templ
             if (keys_templ.find(fk) == keys_templ.end()) // field key not exist - add it
-            {
                 keys_templ[fk] = KeyInfo{};
-            }
-            for (const auto &sfkv : fv) // update all subkeys (in a set)
-                keys_templ[fk].subkeys.insert(sfkv.first);
 
             // update keys_sum_one_record
             if (keys_sum_one_record.find(fk) == keys_sum_one_record.end())
@@ -119,11 +115,41 @@ inline void MarcIsoFile::get_keys_templ() // keys_templ
                 ++keys_sum_one_record[fk];
 
             // update subkeys in keys_templ - choose the bigger one
+            keys_templ[fk].sum = max(keys_templ[fk].sum, keys_sum_one_record[fk]);
+            /*
+            // Todo: Seems a waste of time. Put outside of loop?
             for (const auto &k1rec : keys_sum_one_record)
             {
                 const auto &key_name = k1rec.first;
                 const auto &key_sum = k1rec.second;
                 keys_templ[key_name].sum = max(keys_templ[key_name].sum, key_sum);
+            }
+            */
+
+            // update all subkeys in one key
+            map<string, size_t> subkeys_sum_one_key;
+            for (const auto &sfkv : fv)
+            {
+                auto &keys_templ_skv = keys_templ[fk].subkeys;
+                const auto &sfk = sfkv.first;
+
+                if (keys_templ_skv.find(sfk) == keys_templ_skv.end())
+                    keys_templ_skv[sfk] = 1;
+
+                if (subkeys_sum_one_key.find(sfk) == subkeys_sum_one_key.end())
+                    subkeys_sum_one_key[sfk] = 1;
+                else
+                    ++subkeys_sum_one_key[sfk];
+
+                keys_templ_skv[sfk] = max(keys_templ_skv[sfk], subkeys_sum_one_key[sfk]);
+                /*
+                for (const auto &sk1rec : subkeys_sum_one_key)
+                {
+                    const auto &subkey_name = sk1rec.first;
+                    const auto &subkey_sum = sk1rec.second;
+                    keys_templ_skv[subkey_name] = max(keys_templ_skv[subkey_name], subkey_sum);
+                }
+                */
             }
         }
     }
@@ -140,11 +166,17 @@ inline void MarcIsoFile::records2csv() // records_csv - LF
         const auto &subkeys = key_templ.second.subkeys;
         for (size_t i = 0; i < key_sum; ++i)
         {
-            string suffix = (key_sum < 2) ? string("") : "@" + std::to_string(i);
+            string key_suffix = (key_sum < 2) ? string("") : "@" + std::to_string(i);
             for (auto &sk : subkeys)
             {
-                str_addn(records_csv, key_name + ":" + sk + suffix + "\t", 1);
-                lnlen += 1;
+                const auto &subkey_name = sk.first;
+                const auto &subkey_sum = sk.second;
+                for (size_t j = 0; j < subkey_sum; ++j)
+                {
+                    string subkey_suffix = (subkey_sum < 2) ? string("") : "@" + std::to_string(j);
+                    str_addn(records_csv, key_name + key_suffix + ":" + subkey_name + subkey_suffix + "\t", 1);
+                    lnlen += 1;
+                }
             }
         }
     }
@@ -158,28 +190,23 @@ inline void MarcIsoFile::records2csv() // records_csv - LF
             const auto &key_name = key_templ.first;
             const auto &key_sum = key_templ.second.sum;
             const auto &subkeys = key_templ.second.subkeys;
-            auto key_name_pos_range = rec_kv.equal_range(key_name);
-            /*
-            if (key_name_pos_range.second == key_name_pos_range.first)
-            { // not found - add "\t" & continue to next key
-                str_addn(records_csv, "\t", subkeys.size() * key_sum);
-                continue;
-            }
-            */
+
             size_t key_sum_one_record = 0; // how many instances of this key (like 701) are there in this record
-            for (auto pos = key_name_pos_range; pos.first != pos.second; ++pos.first)
+            for (auto pos = rec_kv.equal_range(key_name); pos.first != pos.second; ++pos.first)
             {
-                const auto &rec_skv = pos.first->second;
+                const auto &rec_skv = pos.first->second; // subfields
+
                 for (auto &sk : subkeys)
                 {
-                    if (rec_skv.find(sk) == rec_skv.end()) // subkey not found
+                    const auto &subkey_name = sk.first;
+                    const auto &subkey_sum = sk.second;
+                    size_t subkey_sum_one_key = 0;
+                    for (auto skpos = rec_skv.equal_range(subkey_name); skpos.first != skpos.second; ++skpos.first)
                     {
-                        str_addn(records_csv, "\t", 1);
+                        str_addn(records_csv, skpos.first->second + "\t");
+                        ++subkey_sum_one_key;
                     }
-                    else
-                    {
-                        str_addn(records_csv, rec_skv.at(sk) + "\t"); // use at() method: this is a const map.
-                    }
+                    str_addn(records_csv, "\t", subkey_sum - subkey_sum_one_key);
                 }
                 ++key_sum_one_record;
             }
